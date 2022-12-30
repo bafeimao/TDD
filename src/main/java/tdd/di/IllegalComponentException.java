@@ -5,7 +5,7 @@ package tdd.di;
  * @package: tdd.di
  * @className: IllegalComponentException
  * @author: ycd20
- * @description: TODO
+ * @description: exception
  * @date: 2022/12/29 16:45
  * @version: 1.0
  */

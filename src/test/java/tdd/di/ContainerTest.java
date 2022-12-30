@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -13,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @package: PACKAGE_NAME
  * @className: tdd.di.ContainerTest
  * @author: ycd20
- * @description: TODO
+ * @description: test
  * @date: 2022/12/29 13:50
  * @version: 1.0
  */
@@ -27,48 +29,54 @@ public class ContainerTest {
     }
 
     @Nested
-    public class ComponentConstruction {
+    class ComponentConstruction {
         //todo instance
         @Test
-        public void should_bind_type_to_a_specific_instance() {
+        void should_bind_type_to_a_specific_instance() {
             Component instance = new Component() {
             };
             context.bind(Component.class, instance);
 
-            Assertions.assertSame(instance, context.get(Component.class));
+            Assertions.assertSame(instance, context.get(Component.class).get());
         }
         //todo abstract class
+
+        @Test
+        void should_return_empty_if_component_not_defined() {
+            Optional<Component> component = context.get(Component.class);
+            assertTrue(component.isEmpty());
+        }
         //todo interface
 
         @Nested
-        public class ConstructedInjection {
+        class ConstructedInjection {
             @Test
-            public void should_bind_type_to_a_class_with_default_constructor() {
+            void should_bind_type_to_a_class_with_default_constructor() {
                 context.bind(Component.class, ComponentWithDefaultConstruct.class);
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
 
                 assertNotNull(instance);
                 assertTrue(instance instanceof ComponentWithDefaultConstruct);
             }
 
             @Test
-            public void should_bind_type_to_a_class_with_inject_constructor() {
+            void should_bind_type_to_a_class_with_inject_constructor() {
                 Dependency dependency = new Dependency() {
                 };
                 context.bind(Component.class, ComponentWithInjectConstructor.class);
                 context.bind(Dependency.class, dependency);
 
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
                 assertNotNull(instance);
                 assertSame(dependency, ((ComponentWithInjectConstructor) instance).getDependency());
             }
 
             @Test
-            public void should_bind_type_to_a_class_with_transitive_dependencies() {
+            void should_bind_type_to_a_class_with_transitive_dependencies() {
                 context.bind(Component.class, ComponentWithInjectConstructor.class);
                 context.bind(Dependency.class, DependencyWithInjectConstructor.class);
                 context.bind(String.class, "indirect dependency");
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
                 assertNotNull(instance);
 
                 Dependency dependency = ((ComponentWithInjectConstructor) instance).getDependency();
@@ -79,20 +87,31 @@ public class ContainerTest {
 
             //todo multi inject constructors
             @Test
-            public void should_throw_exception_if_multi_inject_constructors_provider() {
-                assertThrows(IllegalComponentException.class, () -> {
-                    context.bind(Component.class, ComponentWithMultiInjectConstructors.class);
-                });
+            void should_throw_exception_if_multi_inject_constructors_provider() {
+                assertThrows(IllegalComponentException.class, () -> context.bind(Component.class, ComponentWithMultiInjectConstructors.class));
             }
 
             //todo no default construct and inject constructor
             @Test
-            public void should_throw_exception_if_no_inject_nor_default_constructor_provided() {
-                assertThrows(IllegalComponentException.class, () -> {
-                    context.bind(Component.class, componentWithNoInjectConstructorsNorDefaultConstructor.class);
-                });
+            void should_throw_exception_if_no_inject_nor_default_constructor_provided() {
+                assertThrows(IllegalComponentException.class, () -> context.bind(Component.class, componentWithNoInjectConstructorsNorDefaultConstructor.class));
             }
+
             //todo dependencies not exist
+            @Test
+            void should_throw_exception_if_dependency_not_found() {
+                context.bind(Component.class, ComponentWithInjectConstructor.class);
+                assertThrows(DependencyNotFoundException.class, () -> context.get(Component.class).get());
+            }
+
+            @Test
+            void should_throw_exception_if_cyclic_dependencies_found() {
+                context.bind(Component.class,ComponentWithInjectConstructor.class);
+                context.bind(Dependency.class,DependencyDependOnComponent.class);
+
+                assertThrows(CyclicDependenciesFound.class,() -> context.get(Component.class));
+            }
+
         }
 
         @Nested
@@ -159,7 +178,7 @@ class ComponentWithMultiInjectConstructors implements Component {
 }
 
 class componentWithNoInjectConstructorsNorDefaultConstructor implements Component {
-    public componentWithNoInjectConstructorsNorDefaultConstructor(String name){
+    public componentWithNoInjectConstructorsNorDefaultConstructor(String name) {
 
     }
 }
@@ -174,5 +193,14 @@ class DependencyWithInjectConstructor implements Dependency {
 
     public String getDependency() {
         return dependency;
+    }
+}
+
+class DependencyDependOnComponent implements Dependency {
+    private Component component;
+
+    @Inject
+    public DependencyDependOnComponent(Component component) {
+        this.component = component;
     }
 }
